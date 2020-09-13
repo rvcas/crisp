@@ -1,100 +1,267 @@
 const std = @import("std");
 
+const ArrayList = std.ArrayList;
+
 var input: [2048]u8 = undefined;
 
-const Token = union(enum) {
+const Op = enum {
     add,
-    sub,
-    mul,
-    div,
+    subtract,
+    multiple,
+    divide,
 };
 
-fn computeAdd(expr: []u8) !usize {
-    var sum: usize = 0;
+const Token = union(enum) {
+    paren: u8,
+    op: Op,
+    number: []u8,
+};
+
+fn tokenize(src: []u8, allocator: *std.mem.Allocator) ![]Token {
+    var tokens = ArrayList(Token).init(allocator);
+    errdefer tokens.deinit();
 
     var iter: usize = 0;
-    while (iter < expr.len and expr[iter] != ')') : (iter += 1) {
-        if (expr[iter] == ' ') {
-            continue;
-        }
 
-        sum += std.fmt.parseInt(usize, expr[iter .. iter + 1], 10) catch return error.InvalidNumber;
+    while (iter < src.len) {
+        const ch = src[iter];
+
+        iter += 1;
+
+        switch (ch) {
+            '(', ')' => try tokens.append(.{ .paren = ch }),
+            '+' => try tokens.append(.{ .op = .add }),
+            '-' => try tokens.append(.{ .op = .subtract }),
+            '*' => try tokens.append(.{ .op = .multiple }),
+            '/' => try tokens.append(.{ .op = .divide }),
+            '0'...'9' => {
+                var value = ArrayList(u8).init(allocator);
+                errdefer value.deinit();
+
+                try value.append(ch);
+
+                while (iter < src.len) {
+                    const next = src[iter];
+
+                    switch (next) {
+                        '0'...'9' => {
+                            iter += 1;
+
+                            try value.append(next);
+                        },
+                        else => break,
+                    }
+                }
+
+                try tokens.append(.{ .number = value.items });
+            },
+            ' ' => {},
+            else => return error.InvalidCharacter,
+        }
     }
 
-    return sum;
+    return tokens.items;
 }
 
-fn computeMul(expr: []u8) !usize {
-    var product: usize = 1;
+const ComputeError = error{
+    BadInput,
+    InvalidNumber,
+    NotImplemented,
+    ExpectedOp,
+    OutOfMemory,
+    BadDivisionParams,
+    BadSubtractionParams,
+};
 
-    var iter: usize = 0;
-    while (iter < expr.len and expr[iter] != ')') : (iter += 1) {
-        if (expr[iter] == ' ') {
-            continue;
-        }
-
-        product *= std.fmt.parseInt(usize, expr[iter .. iter + 1], 10) catch return error.InvalidNumber;
+fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) ComputeError!usize {
+    if (iter.* >= tokens.len) {
+        return error.BadInput;
     }
 
-    return product;
-}
+    const token = tokens[iter.*];
 
-fn computeDiv(expr: []u8) !usize {
-    var iter: usize = 0;
-    while (iter < expr.len and expr[iter] == ' ') : (iter += 1) {}
+    iter.* += 1;
 
-    const m = std.fmt.parseInt(usize, expr[iter .. iter + 1], 10) catch return error.InvalidNumber;
+    switch (token) {
+        .number => |num| {
+            const n = std.fmt.parseInt(usize, num, 10) catch return error.InvalidNumber;
 
-    iter += 1;
+            return n;
+        },
+        .paren => |paren| {
+            if (paren == '(') {
+                const next = tokens[iter.*];
 
-    while (iter < expr.len and expr[iter] == ' ') : (iter += 1) {}
+                iter.* += 1;
 
-    const n = std.fmt.parseInt(usize, expr[iter .. iter + 1], 10) catch return error.InvalidNumber;
+                switch (next) {
+                    .op => |op| switch (op) {
+                        .add => {
+                            var sum: usize = 0;
 
-    return m / n;
+                            while (iter.* < tokens.len) {
+                                const second_next = tokens[iter.*];
+
+                                switch (second_next) {
+                                    .paren => |subparen| {
+                                        if (subparen == ')') {
+                                            break;
+                                        }
+
+                                        sum += try compute(tokens, iter, allocator);
+                                    },
+                                    else => {
+                                        sum += try compute(tokens, iter, allocator);
+                                    },
+                                }
+                            }
+
+                            iter.* += 1;
+
+                            return sum;
+                        },
+                        .multiple => {
+                            var product: usize = 1;
+
+                            while (iter.* < tokens.len) {
+                                const second_next = tokens[iter.*];
+
+                                switch (second_next) {
+                                    .paren => |subparen| {
+                                        if (subparen == ')') {
+                                            break;
+                                        }
+
+                                        product *= try compute(tokens, iter, allocator);
+                                    },
+                                    else => {
+                                        product *= try compute(tokens, iter, allocator);
+                                    },
+                                }
+                            }
+
+                            iter.* += 1;
+
+                            return product;
+                        },
+                        .divide => {
+                            var params = ArrayList(usize).init(allocator);
+                            errdefer params.deinit();
+
+                            while (iter.* < tokens.len) {
+                                const second_next = tokens[iter.*];
+
+                                switch (second_next) {
+                                    .paren => |subparen| {
+                                        if (subparen == ')') {
+                                            break;
+                                        }
+
+                                        const result = try compute(tokens, iter, allocator);
+
+                                        try params.append(result);
+                                    },
+                                    else => {
+                                        const result = try compute(tokens, iter, allocator);
+
+                                        try params.append(result);
+                                    },
+                                }
+                            }
+
+                            iter.* += 1;
+
+                            const items = params.items;
+
+                            if (items.len != 2) {
+                                return error.BadDivisionParams;
+                            }
+
+                            return items[0] / items[1];
+                        },
+                        .subtract => {
+                            var params = ArrayList(usize).init(allocator);
+                            errdefer params.deinit();
+
+                            while (iter.* < tokens.len) {
+                                const second_next = tokens[iter.*];
+
+                                switch (second_next) {
+                                    .paren => |subparen| {
+                                        if (subparen == ')') {
+                                            break;
+                                        }
+
+                                        const result = try compute(tokens, iter, allocator);
+
+                                        try params.append(result);
+                                    },
+                                    else => {
+                                        const result = try compute(tokens, iter, allocator);
+
+                                        try params.append(result);
+                                    },
+                                }
+                            }
+
+                            iter.* += 1;
+
+                            const items = params.items;
+
+                            if (items.len != 2) {
+                                return error.BadSubtractionParams;
+                            }
+
+                            return items[0] - items[1];
+                        },
+                    },
+                    else => return error.ExpectedOp,
+                }
+            }
+
+            return error.BadInput;
+        },
+        else => return error.BadInput,
+    }
 }
 
 fn eval(expr: []u8) !usize {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+
+    var tokens = try tokenize(expr, &arena.allocator);
+
     var iter: usize = 0;
 
-    if (expr.len == iter or expr[iter] != '(') {
-        return error.StartParenNotFound;
-    }
-
-    iter += 1;
-
-    var op = expr[iter];
-
-    iter += 1;
-
-    const result = switch (op) {
-        '+' => try computeAdd(expr[iter..]),
-        '*' => try computeMul(expr[iter..]),
-        '/' => try computeDiv(expr[iter..]),
-        else => return error.UnknownOp,
-    };
+    const result = try compute(tokens, &iter, &arena.allocator);
 
     return result;
 }
 
 pub fn main() anyerror!void {
-    std.debug.warn("Crisp Version 0.0.1 🚀\n", .{});
-    std.debug.warn("Press Crtl+c to Exit\n\n", .{});
+    std.debug.print("\u{001b}[36mCrisp Version 0.0.1 🚀\n", .{});
+    std.debug.print("\u{001b}[36mType :q to Exit\n\n", .{});
 
     const stdout = std.io.getStdOut().outStream();
     const stdin = std.io.getStdIn().inStream();
 
     while (true) : (input = undefined) {
-        try stdout.print("crisp> ", .{});
+        try stdout.print("\u{001b}[31;1mcrisp> \u{001b}[36m", .{});
 
         const chars = try stdin.read(input[0..]);
 
+        if (std.mem.eql(u8, input[0 .. chars - 1], ":q")) {
+            try stdout.print("\n\u{001b}[1;32mGoodbye 👋\n\n", .{});
+
+            std.process.exit(0);
+        }
+
         if (eval(input[0 .. chars - 1])) |result| {
-            try stdout.print("\n-> {}\n\n", .{result});
+            try stdout.print("\n\u{001b}[1;32m-> {}\n\n", .{result});
         } else |err| switch (err) {
-            error.StartParenNotFound => try stdout.print("Error: must begin with a '(' \n\n", .{}),
-            error.InvalidNumber => try stdout.print("Error: invalid number \n\n", .{}),
-            error.UnknownOp => try stdout.print("Error: unknown operation \n\n", .{}),
+            error.OutOfMemory => try stdout.print("Error: out of memory \n\n", .{}),
+            error.InvalidCharacter => try stdout.print("Error: invalid character \n\n", .{}),
+            else => try stdout.print("Error: error calculating result \n\n", .{}),
         }
     }
 }
