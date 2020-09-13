@@ -2,6 +2,8 @@
 
 A very minimal lispy calculator implemented in [zig](https://ziglang.org)
 
+![Running Crisp](https://github.com/lrosa007/crisp/raw/master/img/screenshot.png)
+
 ## Operations
 
 - `+` add a sequence of numbers
