@@ -2,7 +2,7 @@
 
 A very minimal lispy calculator implemented in [zig](https://ziglang.org)
 
-![Running Crisp](https://github.com/lrosa007/crisp/raw/master/img/screenshot.png)
+![Running Crisp](https://github.com/rvcas/crisp/raw/main/img/screenshot.png)
 
 ## Operations
 
