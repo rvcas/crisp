@@ -242,26 +242,26 @@ pub fn main() anyerror!void {
     std.debug.print("\u{001b}[36mCrisp Version 0.0.1 🚀\n", .{});
     std.debug.print("\u{001b}[36mType :q to Exit\n\n", .{});
 
-    const stdout = std.io.getStdOut().outStream();
-    const stdin = std.io.getStdIn().inStream();
+    const stdout = std.io.getStdOut();
+    const stdin = std.io.getStdIn();
 
     while (true) : (input = undefined) {
-        try stdout.print("\u{001b}[31;1mcrisp> \u{001b}[36m", .{});
+        var idk = try stdout.write("\u{001b}[31;1mcrisp> \u{001b}[36m");
 
         const chars = try stdin.read(input[0..]);
 
         if (std.mem.eql(u8, input[0 .. chars - 1], ":q")) {
-            try stdout.print("\n\u{001b}[1;32mGoodbye 👋\n\n", .{});
+            var idk = try stdout.write("\n\u{001b}[1;32mGoodbye 👋\n\n");
 
             std.process.exit(0);
         }
 
         if (eval(input[0 .. chars - 1])) |result| {
-            try stdout.print("\n\u{001b}[1;32m-> {}\n\n", .{result});
+            try stdout.write("\n\u{001b}[1;32m-> {}\n\n", .{result});
         } else |err| switch (err) {
-            error.OutOfMemory => try stdout.print("Error: out of memory \n\n", .{}),
-            error.InvalidCharacter => try stdout.print("Error: invalid character \n\n", .{}),
-            else => try stdout.print("Error: error calculating result \n\n", .{}),
+            error.OutOfMemory => try stdout.write("Error: out of memory \n\n"),
+            error.InvalidCharacter => try stdout.write("Error: invalid character \n\n", .{}),
+            else => try stdout.write("Error: error calculating result \n\n", .{}),
         }
     }
 }
