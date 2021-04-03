@@ -242,8 +242,8 @@ pub fn main() anyerror!void {
     std.debug.print("\u{001b}[36mCrisp Version 0.0.1 🚀\n", .{});
     std.debug.print("\u{001b}[36mType :q to Exit\n\n", .{});
 
-    const stdout = std.io.getStdOut().outStream();
-    const stdin = std.io.getStdIn().inStream();
+    const stdout = std.io.getStdOut().writer();
+    const stdin = std.io.getStdIn().reader();
 
     while (true) : (input = undefined) {
         try stdout.print("\u{001b}[31;1mcrisp> \u{001b}[36m", .{});
