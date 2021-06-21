@@ -7,7 +7,7 @@ var input: [2048]u8 = undefined;
 const Op = enum {
     add,
     subtract,
-    multiple,
+    multiply,
     divide,
 };
 
@@ -32,7 +32,7 @@ fn tokenize(src: []u8, allocator: *std.mem.Allocator) ![]Token {
             '(', ')' => try tokens.append(.{ .paren = ch }),
             '+' => try tokens.append(.{ .op = .add }),
             '-' => try tokens.append(.{ .op = .subtract }),
-            '*' => try tokens.append(.{ .op = .multiple }),
+            '*' => try tokens.append(.{ .op = .multiply }),
             '/' => try tokens.append(.{ .op = .divide }),
             '0'...'9' => {
                 var value = ArrayList(u8).init(allocator);
@@ -120,7 +120,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
 
                             return sum;
                         },
-                        .multiple => {
+                        .multiply => {
                             var product: usize = 1;
 
                             while (iter.* < tokens.len) {
