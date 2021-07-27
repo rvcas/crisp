@@ -188,7 +188,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                             return result;
                         },
                         .subtract => {
-                            var sum: isize = 0;
+                            var sub: isize = 0;
 
                             while (iter.* < tokens.len) {
                                 const second_next = tokens[iter.*];
@@ -199,17 +199,17 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                                             break;
                                         }
 
-                                        sum -= try compute(tokens, iter, allocator);
+                                        sub -= try compute(tokens, iter, allocator);
                                     },
                                     else => {
-                                        sum -= try compute(tokens, iter, allocator);
+                                        sub -= try compute(tokens, iter, allocator);
                                     },
                                 }
                             }
 
                             iter.* += 1;
 
-                            return sum;
+                            return sub;
                         },
                     },
                     else => return error.ExpectedOp,
