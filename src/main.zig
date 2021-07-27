@@ -284,10 +284,7 @@ pub fn main() anyerror!void {
 
         if (eval(chars)) |result| {
             try term.printWithAttributes(.{
-                terminal.TextAttributes{
-                    .foreground = .green,
-                    .bold = true,
-                },
+                .{ .foreground = .green, .bold = true },
                 terminal.format("\n-> {}\n\n", .{result}),
                 .reset,
             });
