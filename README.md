@@ -8,10 +8,12 @@ A very minimal lispy calculator implemented in [zig](https://ziglang.org)
 
 - `+` add a sequence of numbers
   - `(+ 1 2 3)`
-- `-` subtract two numbers
+- `-` subtract a sequence of numbers
   - `(- 3 2)`
 - `*` multiply a sequence of numbers
   - `(* 3 5 2)`
-- `/` divide two numbers
+- `/` divide a sequence of numbers
   - `(/ 12 4)`
   - decimals are not supported. meaning: `(/ 2 4) => 0`
+    - everything is floored
+  - divide by zero results in an error
