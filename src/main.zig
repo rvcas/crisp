@@ -69,10 +69,11 @@ const ComputeError = error{
     ExpectedOp,
     OutOfMemory,
     BadDivisionParams,
+    DivisionByZero,
     BadSubtractionParams,
 };
 
-fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) ComputeError!usize {
+fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) ComputeError!isize {
     if (iter.* >= tokens.len) {
         return error.BadInput;
     }
@@ -83,7 +84,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
 
     switch (token) {
         .number => |num| {
-            const n = std.fmt.parseInt(usize, num, 10) catch return error.InvalidNumber;
+            const n = std.fmt.parseInt(isize, num, 10) catch return error.InvalidNumber;
 
             return n;
         },
@@ -96,7 +97,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                 switch (next) {
                     .op => |op| switch (op) {
                         .add => {
-                            var sum: usize = 0;
+                            var sum: isize = 0;
 
                             while (iter.* < tokens.len) {
                                 const second_next = tokens[iter.*];
@@ -120,7 +121,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                             return sum;
                         },
                         .multiply => {
-                            var product: usize = 1;
+                            var product: isize = 1;
 
                             while (iter.* < tokens.len) {
                                 const second_next = tokens[iter.*];
@@ -144,7 +145,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                             return product;
                         },
                         .divide => {
-                            var params = ArrayList(usize).init(allocator);
+                            var params = ArrayList(isize).init(allocator);
                             errdefer params.deinit();
 
                             while (iter.* < tokens.len) {
@@ -172,15 +173,22 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
 
                             const items = params.items;
 
-                            if (items.len != 2) {
+                            if (items.len < 2) {
                                 return error.BadDivisionParams;
                             }
 
-                            return items[0] / items[1];
+                            var result = items[0];
+
+                            for (items[1..]) |item| {
+                                if (item == 0) return error.DivisionByZero;
+
+                                result = @divFloor(result, item);
+                            }
+
+                            return result;
                         },
                         .subtract => {
-                            var params = ArrayList(usize).init(allocator);
-                            errdefer params.deinit();
+                            var sum: isize = 0;
 
                             while (iter.* < tokens.len) {
                                 const second_next = tokens[iter.*];
@@ -191,27 +199,17 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
                                             break;
                                         }
 
-                                        const result = try compute(tokens, iter, allocator);
-
-                                        try params.append(result);
+                                        sum -= try compute(tokens, iter, allocator);
                                     },
                                     else => {
-                                        const result = try compute(tokens, iter, allocator);
-
-                                        try params.append(result);
+                                        sum -= try compute(tokens, iter, allocator);
                                     },
                                 }
                             }
 
                             iter.* += 1;
 
-                            const items = params.items;
-
-                            if (items.len != 2) {
-                                return error.BadSubtractionParams;
-                            }
-
-                            return items[0] - items[1];
+                            return sum;
                         },
                     },
                     else => return error.ExpectedOp,
@@ -224,7 +222,7 @@ fn compute(tokens: []Token, iter: *usize, allocator: *std.mem.Allocator) Compute
     }
 }
 
-fn eval(expr: []u8) !usize {
+fn eval(expr: []u8) !isize {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
 
