@@ -1,0 +1,3 @@
+[submodule "deps/zig-terminal"]
+	path = deps/zig-terminal
+	url = git@github.com:truemedian/zig-terminal.git
