@@ -1,8 +1,7 @@
 const std = @import("std");
+const terminal = @import("zig-terminal");
 
 const ArrayList = std.ArrayList;
-
-var input: [2048]u8 = undefined;
 
 const Op = enum {
     add,
@@ -239,29 +238,92 @@ fn eval(expr: []u8) !usize {
 }
 
 pub fn main() anyerror!void {
-    std.debug.print("\u{001b}[36mCrisp Version 0.0.1 🚀\n", .{});
-    std.debug.print("\u{001b}[36mType :q to Exit\n\n", .{});
+    var term = terminal.Terminal.init();
 
-    const stdout = std.io.getStdOut().writer();
-    const stdin = std.io.getStdIn().reader();
+    try term.printWithAttributes(.{
+        .blue,
+        "Crisp Version 0.0.1 🚀\n",
+        "Type :q to Exit\n\n",
+        .reset,
+    });
 
-    while (true) : (input = undefined) {
-        try stdout.print("\u{001b}[31;1mcrisp> \u{001b}[36m", .{});
+    while (true) {
+        try term.printWithAttributes(.{
+            terminal.TextAttributes{
+                .foreground = .magenta,
+                .bold = true,
+            },
+            "crisp> ",
+            terminal.TextAttributes{
+                .foreground = .cyan,
+                .bold = true,
+            },
+        });
 
-        const chars = try stdin.read(input[0..]);
+        const chars = try term.reader().readUntilDelimiterAlloc(
+            std.heap.page_allocator,
+            '\n',
+            std.math.maxInt(usize),
+        );
+        defer std.heap.page_allocator.free(chars);
 
-        if (std.mem.eql(u8, input[0 .. chars - 1], ":q")) {
-            try stdout.print("\n\u{001b}[1;32mGoodbye 👋\n\n", .{});
+        try term.resetAttributes();
+
+        if (std.mem.eql(u8, chars, ":q")) {
+            try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .green,
+                    .bold = true,
+                },
+                "\nGoodbye 👋\n",
+                .reset,
+            });
 
             std.process.exit(0);
         }
 
-        if (eval(input[0 .. chars - 1])) |result| {
-            try stdout.print("\n\u{001b}[1;32m-> {}\n\n", .{result});
+        if (eval(chars)) |result| {
+            try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .green,
+                    .bold = true,
+                },
+                terminal.format("\n-> {}\n\n", .{result}),
+                .reset,
+            });
         } else |err| switch (err) {
-            error.OutOfMemory => try stdout.print("Error: out of memory \n\n", .{}),
-            error.InvalidCharacter => try stdout.print("Error: invalid character \n\n", .{}),
-            else => try stdout.print("Error: error calculating result \n\n", .{}),
+            error.OutOfMemory => try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .red,
+                    .bold = true,
+                },
+                "Error: out of memory \n\n",
+                .reset,
+            }),
+            error.InvalidCharacter => try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .red,
+                    .bold = true,
+                },
+                "Error: invalid character \n\n",
+                .reset,
+            }),
+            error.DivisionByZero => try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .red,
+                    .bold = true,
+                },
+                "Error: canot divide by zero \n\n",
+                .reset,
+            }),
+            else => try term.printWithAttributes(.{
+                terminal.TextAttributes{
+                    .foreground = .red,
+                    .bold = true,
+                },
+                "Error: error calculating result \n\n",
+                .reset,
+            }),
         }
     }
 }
